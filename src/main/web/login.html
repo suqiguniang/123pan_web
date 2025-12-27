@@ -1,0 +1,231 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>123云盘 - 登录</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo h1 {
+            color: #2B79E6;
+            font-size: 28px;
+            margin: 0;
+        }
+        
+        .logo p {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #DCEEFF;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #2B79E6;
+            box-shadow: 0 0 0 2px rgba(43, 121, 230, 0.1);
+        }
+        
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #2B79E6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .login-btn:hover {
+            background-color: #1F63C9;
+        }
+        
+        .login-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .error-message {
+            background-color: #fee;
+            color: #c00;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>123云盘</h1>
+            <p>安全、高速、免费的云存储服务</p>
+        </div>
+        
+        <div id="errorMessage" class="error-message"></div>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input type="text" id="username" name="username" required placeholder="请输入用户名">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" required placeholder="请输入密码">
+            </div>
+            
+            <button type="submit" class="login-btn" id="loginBtn">
+                <span id="btnText">登录</span>
+                <span id="loadingSpinner" style="display: none;">加载中...</span>
+            </button>
+        </form>
+        
+        <div class="footer">
+            <p>123云盘 Web版</p>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const btnText = document.getElementById('btnText');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            // 验证输入
+            if (!username || !password) {
+                showError('用户名和密码不能为空');
+                return;
+            }
+            
+            // 显示加载状态
+            loginBtn.disabled = true;
+            btnText.style.display = 'none';
+            loadingSpinner.style.display = 'inline';
+            errorMessage.style.display = 'none';
+            
+            try {
+                console.log('发送登录请求...');
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    }),
+                    // 允许重定向
+                    redirect: 'follow'
+                });
+                
+                console.log('响应状态:', response.status, response.statusText);
+                console.log('响应URL:', response.url);
+                
+                if (response.redirected) {
+                    // 服务器返回了重定向，直接跳转
+                    console.log('服务器重定向到:', response.url);
+                    window.location.href = response.url;
+                    return;
+                }
+                
+                // 如果不是重定向，尝试解析JSON
+                const contentType = response.headers.get('content-type') || '';
+                console.log('Content-Type:', contentType);
+                
+                if (contentType.includes('application/json')) {
+                    const data = await response.json();
+                    console.log('JSON响应:', data);
+                    
+                    if (data.success) {
+                        if (data.redirect) {
+                            // 服务器在JSON中指定了重定向URL
+                            window.location.href = data.redirect;
+                        } else {
+                            // 默认跳转到首页
+                            window.location.href = '/index.html';
+                        }
+                    } else {
+                        showError(data.message || '登录失败，请检查用户名和密码');
+                    }
+                } else {
+                    // 不是JSON，可能是HTML错误页面
+                    const text = await response.text();
+                    console.log('非JSON响应:', text.substring(0, 200));
+                    
+                    if (response.ok) {
+                        // 如果是成功的响应但不是JSON，可能服务器配置有问题
+                        console.log('响应成功但不是JSON，尝试直接跳转');
+                        window.location.href = '/index.html';
+                    } else {
+                        throw new Error(`服务器返回了错误页面 (${response.status})`);
+                    }
+                }
+            } catch (error) {
+                console.error('登录错误:', error);
+                showError('登录失败: ' + error.message);
+            } finally {
+                // 恢复按钮状态
+                loginBtn.disabled = false;
+                btnText.style.display = 'inline';
+                loadingSpinner.style.display = 'none';
+            }
+        });
+        
+        function showError(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+        
+        // 自动聚焦用户名输入框
+        document.getElementById('username').focus();
+    </script>
+</body>
+</html>
