@@ -3,14 +3,14 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - main          # 推送到 main 分支时自动构建
+      - main
     tags:
-      - 'v*'          # 推送标签（如 v1.0.0）也会触发
-  workflow_dispatch:   # 允许手动触发
+      - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write      # 推送镜像需要 packages 写入权限
+  packages: write
 
 jobs:
   docker:
@@ -33,11 +33,11 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}   # 例如 ghcr.io/suqiguniang/123pan_web
+          images: ghcr.io/${{ github.repository }}
           tags: |
+            type=raw,value=latest
             type=ref,event=branch
             type=ref,event=tag
-            type=raw,value=latest
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -47,3 +47,17 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      # ----- 新增：导出镜像为 tar 并上传为 Artifact -----
+      - name: Pull image back from ghcr.io (使用 latest 标签)
+        run: docker pull ghcr.io/${{ github.repository }}:latest
+
+      - name: Save image to tar
+        run: docker save -o 123pan-web.tar ghcr.io/${{ github.repository }}:latest
+
+      - name: Upload image as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 123pan-web-docker-image
+          path: 123pan-web.tar
+          retention-days: 5   # 保留天数，按需调整
